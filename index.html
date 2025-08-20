@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tap Toggle</title>
+
+  <!-- Mobile-friendly + prevent zoom on double-tap -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+  <!-- iOS fullscreen if added to Home Screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  
+  <!-- Android fullscreen -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  
+  <!-- Prevent zoom and ensure full viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+  <style>
+    /* Fill screen, no scroll, no text selection */
+    html, body { height: 100%; margin: 0; background: #000; }
+    body { overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    /* The image fills the viewport like a wallpaper */
+    #screen {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center;
+      display: block; opacity: 1; transition: opacity 120ms ease;
+      touch-action: manipulation; /* faster taps */
+      -webkit-tap-highlight-color: transparent;
+      pointer-events: none; /* so the page gets the tap */
+    }
+    /* (Optional) fade on swap */
+    .fade { opacity: 0; }
+  </style>
+</head>
+<body>
+  <img id="screen" alt="" />
+
+  <script>
+    // --- CONFIG ------------------------------------------------------------
+    // Direct image assignments
+    const IMG_A = "images/1ski.jpeg";
+    const IMG_B = "images/2ski.jpeg";
+    // ----------------------------------------------------------------------
+
+    const imgEl = document.getElementById("screen");
+    const preA = new Image(), preB = new Image();
+    preA.src = IMG_A; preB.src = IMG_B; // preload both
+    let showA = true;
+    let firstTapDone = false;
+
+    // Set initial image once preloaded (fallback immediately if cached)
+    function setInitial() {
+      imgEl.src = preA.complete ? IMG_A : IMG_A;
+    }
+    setInitial();
+
+    // Try to enter fullscreen on first user tap (Android/desktop; iOS needs Add to Home Screen)
+    async function goFullscreenOnce() {
+      if (firstTapDone) return;
+      firstTapDone = true;
+      const el = document.documentElement;
+      
+      // Try multiple fullscreen methods for better mobile support
+      try {
+        if (!document.fullscreenElement) {
+          if (el.requestFullscreen) {
+            await el.requestFullscreen();
+          } else if (el.webkitRequestFullscreen) {
+            await el.webkitRequestFullscreen();
+          } else if (el.mozRequestFullScreen) {
+            await el.mozRequestFullScreen();
+          } else if (el.msRequestFullscreen) {
+            await el.msRequestFullscreen();
+          }
+        }
+      } catch (e) {
+        console.log('Fullscreen not supported or blocked:', e);
+      }
+      
+      // Mobile-specific tricks to hide UI
+      if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        // Hide address bar on mobile
+        window.scrollTo(0, 1);
+        setTimeout(() => window.scrollTo(0, 0), 100);
+        
+        // Try to lock orientation if supported
+        if (screen.orientation && screen.orientation.lock) {
+          try {
+            screen.orientation.lock('portrait');
+          } catch (e) {
+            // Orientation lock not supported
+          }
+        }
+      }
+    }
+
+    function swap() {
+      imgEl.classList.add("fade");
+      // Small timeout to let the fade start
+      setTimeout(() => {
+        showA = !showA;
+        imgEl.src = showA ? IMG_A : IMG_B;
+        imgEl.classList.remove("fade");
+      }, 80);
+    }
+
+    // Prevent accidental gestures that reveal browser UI
+    let lastTouch = 0;
+    function onTap() {
+      const now = Date.now();
+      if (now - lastTouch < 300) return; // ignore immediate double-tap
+      lastTouch = now;
+      goFullscreenOnce();
+      swap();
+    }
+
+    // Listen for any pointer/touch/mouse
+    document.addEventListener("pointerdown", onTap, { passive: true });
+    document.addEventListener("keydown", (e) => {
+      // Space/Enter also toggles (handy for desktop testing)
+      if (e.key === " " || e.key === "Enter") onTap();
+    });
+
+    // Block context menu/long-press popups
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
+    document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+    // iOS address bar hide trick on load
+    window.addEventListener("load", () => setTimeout(() => window.scrollTo(0, 1), 250));
+  </script>
+</body>
+</html>
